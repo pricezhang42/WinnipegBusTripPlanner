@@ -130,12 +130,33 @@ export default function MapScreen() {
           console.warn("No matching relation found for origin and destination nodes.");
           return [];
         }
-  
-        const coordinates = extractRelationCoordinates(relation);
-        return extractSegmentBetweenStops(coordinates, originNode.coordinates, destinationNode.coordinates);
+        
+        // TODO probably not convert to points before filtering?
+        // const coordinates = extractRelationCoordinates(relation);
+        const ways = [];
+        relation.members
+          .filter(m => m.type === 'way' && m.geometry)
+          .map((way, index) => {
+            // Convert geometry to { latitude, longitude }
+            const coords = way.geometry.map(pt => ({
+              latitude: pt.lat,
+              longitude: pt.lon
+            }));
+            ways.push(coords);
+          });
+        const waysInBetween = extractWaysBetweenStops(ways, originNode.coordinates, destinationNode.coordinates);
+        return waysInBetween;
+        // return extractSegmentBetweenStops(coordinates, originNode.coordinates, destinationNode.coordinates);
       }));
+
+      const wayList = [];
+      routeDataList.map((ways) => (
+        ways.map((way) => (
+          wayList.push(way)
+        ))
+      ))
   
-      setRouteData(routeDataList);
+      setRouteData(wayList);
     } catch (err) {
       console.error("Error fetching route data:", err);
       setError("Failed to load route data");
@@ -218,9 +239,55 @@ export default function MapScreen() {
       return capturing || isCloseTo(coord, origin) || isCloseTo(coord, destination);
     });
   };
+
+  function extractWaysBetweenStops(ways, origin, destination) {
+    let capturing = false;  // Whether we've encountered the origin yet
+    let done = false;       // Whether we've encountered the destination
+    const results = [];
+  
+    for (let w = 0; w < ways.length; w++) {
+      const coords = ways[w];
+      const keptPoints = [];
+  
+      // Walk through each coordinate in this way
+      for (let c = 0; c < coords.length; c++) {
+        const point = coords[c];
+  
+        // If we're not capturing yet, check if this coordinate is the origin
+        if (!capturing) {
+          if (isCloseTo(point, origin)) {
+            capturing = true;
+            keptPoints.push(point);
+          }
+        } else {
+          // We are capturing: keep this point
+          keptPoints.push(point);
+  
+          // Check if we've reached the destination
+          if (isCloseTo(point, destination)) {
+            capturing = false;
+            done = true;
+            break; // No need to check more points in this way
+          }
+        }
+      }
+  
+      // If we kept any portion of this way, add it to results
+      if (keptPoints.length > 0) {
+        results.push(keptPoints);
+      }
+  
+      // If we already found the destination, we're done
+      if (done) {
+        break;
+      }
+    }
+  
+    return results;
+  }
   
   // Helper function: Check if a point is close to a target
-  const isCloseTo = (point, target, threshold = 0.0005) => {
+  const isCloseTo = (point, target, threshold = 0.0003) => {
     return (
       Math.abs(point.latitude - target.latitude) < threshold &&
       Math.abs(point.longitude - target.longitude) < threshold
@@ -285,13 +352,13 @@ export default function MapScreen() {
         urlTemplate={"http://c.tile.openstreetmap.org/{z}/{x}/{y}.png"}
         maximumZ={19}
       />
-      {routeData.map((coordinates, index) => (
-        <Polyline
-          key={index}
-          coordinates={coordinates}
-          strokeWidth={3}
-          strokeColor="blue"
-        />
+      {routeData.map((way, index) => (
+          <Polyline
+            key={index}
+            coordinates={way}
+            strokeWidth={3}
+            strokeColor="blue"
+          />
       ))}
       {error && <Text style={{ color: 'red', position: 'absolute', top: 10 }}>{error}</Text>}
     </MapView>
