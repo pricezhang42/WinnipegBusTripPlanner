@@ -122,13 +122,13 @@ export default function MapScreen() {
         const { originNode, destinationNode } = extractNodes(data, ride);
         if (!originNode || !destinationNode) {
           console.warn("Origin or destination node not found for ride:", ride);
-          return [];
+          return [ride.origin, ride.destination];
         }
   
         const relation = findRelationWithNodes(data, originNode.id, destinationNode.id);
         if (!relation) {
           console.warn("No matching relation found for origin and destination nodes.");
-          return [];
+          return [originNode.coordinates, destinationNode.coordinates];
         }
   
         const coordinates = extractRelationCoordinates(relation);
@@ -198,13 +198,11 @@ export default function MapScreen() {
   // Helper function: Extract coordinates from a relation
   const extractRelationCoordinates = (relation) => {
     return relation.members
-      .filter((member) => member.type === "way" && member.geometry)
-      .flatMap((way) =>
-        way.geometry.map((point) => ({
-          latitude: point.lat,
-          longitude: point.lon,
-        }))
-      );
+      .filter((member) => member.type === "node" && member.lat && member.lon)
+      .map((node) => ({
+        latitude: node.lat,
+        longitude: node.lon,
+      }));
   };
   
   // Helper function: Extract segment between origin and destination stops
