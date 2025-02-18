@@ -131,7 +131,7 @@ export default function MapScreen() {
           return [];
         }
   
-        const coordinates = extractRelationCoordinates(relation);
+        const coordinates = buildContinuousRoute(relation);
         return extractSegmentBetweenStops(coordinates, originNode.coordinates, destinationNode.coordinates);
       }));
   
@@ -196,16 +196,73 @@ export default function MapScreen() {
   };
   
   // Helper function: Extract coordinates from a relation
-  const extractRelationCoordinates = (relation) => {
-    return relation.members
-      .filter((member) => member.type === "way" && member.geometry)
-      .flatMap((way) =>
-        way.geometry.map((point) => ({
-          latitude: point.lat,
-          longitude: point.lon,
-        }))
-      );
-  };
+  function buildContinuousRoute(relation) {
+    // Get all ways
+    const ways = relation.members
+      .filter(m => m.type === "way" && m.geometry)
+      .map(m => m.geometry.map((point) => ({
+        latitude: point.lat,
+        longitude: point.lon,
+      })));
+  
+    if (ways.length === 0) return [];
+  
+    // Start with the first way
+    let orderedWays = [ ways[0] ];
+    ways.splice(0, 1); // remove the first from the unlinked list
+  
+    let currentEnd = orderedWays[0][orderedWays[0].length - 1];
+  
+    // Keep linking until no ways left or no match found
+    while (ways.length) {
+      // Look for a way whose start or end matches currentEnd
+      let foundIndex = -1;
+      let reversed = false;
+  
+      for (let i = 0; i < ways.length; i++) {
+        let w = ways[i];
+        let start = w[0];
+        let end = w[w.length - 1];
+  
+        // Compare with currentEnd
+        if (isCloseTo(start, currentEnd, 0.0005)) {
+          foundIndex = i;
+          reversed = false;
+          break;
+        }
+        if (isCloseTo(end, currentEnd, 0.0005)) {
+          foundIndex = i;
+          reversed = true;
+          break;
+        }
+      }
+  
+      if (foundIndex === -1) {
+        // no matching segment found
+        break;
+      }
+  
+      let nextWay = ways.splice(foundIndex, 1)[0];
+      if (reversed) {
+        nextWay.reverse(); // so it connects properly
+      }
+  
+      // Append nextWay to orderedWays
+      // but skip duplication of the shared endpoint
+      orderedWays.push(nextWay);
+  
+      // Update currentEnd
+      currentEnd = nextWay[nextWay.length - 1];
+    }
+  
+    // Flatten orderedWays into a single array of coordinates
+    const routeCoordinates = orderedWays.flat();
+    return routeCoordinates;
+  }
+
+  function pointsAreClose(p1, p2, threshold=1e-5) {
+    return Math.abs(p1[0] - p2[0]) < threshold && Math.abs(p1[1] - p2[1]) < threshold;
+  }
   
   // Helper function: Extract segment between origin and destination stops
   const extractSegmentBetweenStops = (coordinates, origin, destination) => {
@@ -215,7 +272,7 @@ export default function MapScreen() {
       if (!capturing && isCloseTo(coord, origin)) capturing = true;
       if (capturing && isCloseTo(coord, destination)) capturing = false;
   
-      return capturing || isCloseTo(coord, origin) || isCloseTo(coord, destination);
+      return capturing || isCloseTo(coord, origin, 0.0005) || isCloseTo(coord, destination, 0.0005);
     });
   };
   
