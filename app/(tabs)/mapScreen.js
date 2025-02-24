@@ -1,78 +1,10 @@
-// import React, { useEffect, useState } from 'react';
-// import { View, Text } from 'react-native';
-// import MapView, { Polyline, UrlTile } from 'react-native-maps';
-
-// export default function MapScreen() {
-//   const [routeCoordinates, setRouteCoordinates] = useState([]);
-//   const [error, setError] = useState(null);
-
-//   const fetchRouteData = async () => {
-//     try {
-//       const query = `
-//           [out:json][timeout:25];
-//           area[name="Winnipeg"]->.searchArea;
-//           (
-//             relation["type"="route"]["route"="bus"]["ref"="60"](area.searchArea);
-//           );
-//           out geom;
-//       `;
-//       const response = await fetch('https://overpass-api.de/api/interpreter', {
-//         method: 'POST',
-//         body: query,
-//       });
-//       const data = await response.json();
-//       console.log(data);
-
-//       const coordinates = data.elements
-//         .flatMap((element) =>
-//           element.members
-//             .filter((member) => member.type === 'way' && member.geometry)
-//             .flatMap((way) =>
-//               way.geometry.map((point) => ({
-//                 latitude: point.lat,
-//                 longitude: point.lon,
-//               }))
-//             )
-//         );
-
-//       setRouteCoordinates(coordinates);
-//     } catch (err) {
-//       console.error('Error fetching route data:', err);
-//       setError('Failed to load route data');
-//     }
-//   };
-
-//   useEffect(() => {
-//     fetchRouteData();
-//   }, []);
-
-//   return (
-//     <MapView
-//       style={{ flex: 1 }}
-//       initialRegion={{
-//         latitude: routeCoordinates.length ? routeCoordinates[0].latitude : 49.8951,
-//         longitude: routeCoordinates.length ? routeCoordinates[0].longitude : -97.1384,
-//         latitudeDelta: 0.1,
-//         longitudeDelta: 0.1,
-//       }}
-//     >
-//       <UrlTile
-//         urlTemplate={"http://c.tile.openstreetmap.org/{z}/{x}/{y}.png"}
-//         maximumZ={19}
-//       />
-//       {routeCoordinates.length > 0 && (
-//         <Polyline coordinates={routeCoordinates} strokeWidth={3} strokeColor="blue" />
-//       )}
-//     </MapView>
-//   );
-// }
-
-
-
 import React, { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { Text, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import MapView, { Polyline, UrlTile } from 'react-native-maps';
+import MapView, { Polyline, UrlTile, Circle  } from 'react-native-maps';
+
+// Define a color palette
+const colorPalette = ['blue', 'black', 'green'];
 
 // Parse `route` once outside the component to avoid re-triggering `useEffect` continuously
 const parseRoute = (route) => {
@@ -278,18 +210,40 @@ export default function MapScreen() {
         latitudeDelta: 0.1,
         longitudeDelta: 0.1,
       }}
+      mapType={Platform.OS == "android" ? "none" : "standard"}
     >
       <UrlTile
-        urlTemplate={"http://c.tile.openstreetmap.org/{z}/{x}/{y}.png"}
+        urlTemplate={"https://tile.openstreetmap.de/{z}/{x}/{y}.png"}
         maximumZ={19}
+        zIndex={-1} // Render beneath other components
       />
       {routeData.map((coordinates, index) => (
+        <React.Fragment key={index}>
         <Polyline
-          key={index}
           coordinates={coordinates}
           strokeWidth={3}
-          strokeColor="blue"
+          strokeColor={colorPalette[index % colorPalette.length]} // Assign color based on index
+          zIndex={1} // Render above UrlTile
         />
+        {/* Hollow Circle at the Start Point */}
+        <Circle
+          center={coordinates[0]}
+          radius={10} // Radius in meters
+          strokeWidth={2}
+          strokeColor={colorPalette[index % colorPalette.length]}
+          fillColor="transparent"
+          zIndex={2} // Render above Polyline
+        />
+        {/* Hollow Circle at the End Point */}
+        <Circle
+          center={coordinates[coordinates.length - 1]}
+          radius={10} // Radius in meters
+          strokeWidth={2}
+          strokeColor={colorPalette[index % colorPalette.length]}
+          fillColor="transparent"
+          zIndex={2} // Render above Polyline
+        />
+      </React.Fragment>
       ))}
       {error && <Text style={{ color: 'red', position: 'absolute', top: 10 }}>{error}</Text>}
     </MapView>
