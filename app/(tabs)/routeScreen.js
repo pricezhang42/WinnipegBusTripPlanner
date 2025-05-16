@@ -90,7 +90,7 @@ export default function RouteResultsScreen() {
       const coordOrigin = [originLat, originLng];
       const coordDest = [destinationLat, destinationLng];
       try {
-        const response = await axios.post('http://10.0.0.189:3000/myFunction', {
+        const response = await axios.post('http://192.168.0.189:3000/myFunction', {
           coordOrigin,
           coordDest,
         });

@@ -35,6 +35,7 @@
     "react-native-gesture-handler": "~2.20.2",
     "react-native-get-random-values": "^1.11.0",
     "react-native-google-places-autocomplete": "^2.5.7",
+    "react-native-mapbox-places-autocomplete": "^0.0.3",
     "react-native-maps": "1.18.0",
     "react-native-maps-osmdroid": "^0.26.1-rc1",
     "react-native-reanimated": "^3.16.7",

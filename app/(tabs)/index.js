@@ -1,36 +1,25 @@
-import 'react-native-get-random-values';
 import React, { useState } from 'react';
 import { View, Button, StyleSheet } from 'react-native';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import MapboxPlacesAutocomplete from 'react-native-mapbox-places-autocomplete';
 import { router } from 'expo-router';
 
-const GOOGLE_PLACES_API_KEY = 'AIzaSyDjpkA1wkyhf5VjzfkeIOqP9IzZLn55C80'; // Replace with your API key
+const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoicmFtZXI0MiIsImEiOiJjbTd0YW9hMDUwb3dkMmtwbDIxYzlrMG1uIn0.RI7UnUqXMAh0IbYZNqRFMA'; // Replace with your Mapbox access token
 
-// Reusable GooglePlacesInput component
-const GooglePlacesInput = ({ placeholder, onPlaceSelected }) => (
-  <GooglePlacesAutocomplete
+const MapboxPlacesInput = ({ placeholder, onPlaceSelected }) => (
+  <MapboxPlacesAutocomplete
+    id={placeholder}
     placeholder={placeholder}
-    onPress={(data, details = null) => {
+    accessToken={MAPBOX_ACCESS_TOKEN}
+    onPlaceSelect={(data) => {
       onPlaceSelected({
-        description: data.description,
-        lat: details.geometry.location.lat,
-        lng: details.geometry.location.lng,
+        description: data.place_name,
+        lat: data.geometry.coordinates[1],
+        lng: data.geometry.coordinates[0],
       });
     }}
-    query={{
-      key: GOOGLE_PLACES_API_KEY,
-      language: 'en',
-      location: '49.8951,-97.1384', // Center point of Winnipeg
-      radius: 50000, // 50 km radius
-    }}
-    minLength={4}
-    fetchDetails={true}
-    styles={{
-      textInputContainer: styles.inputContainer,
-      textInput: styles.textInput,
-      listView: styles.listView,
-      row: styles.row,
-    }}
+    countryId="ca" // Limit results to Canada
+    inputClassName="input"
+    containerClassName="container"
   />
 );
 
@@ -58,8 +47,8 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <GooglePlacesInput placeholder="Enter Origin" onPlaceSelected={setOrigin} />
-      <GooglePlacesInput placeholder="Enter Destination" onPlaceSelected={setDestination} />
+      <MapboxPlacesInput placeholder="Enter Origin" onPlaceSelected={setOrigin} />
+      <MapboxPlacesInput placeholder="Enter Destination" onPlaceSelected={setDestination} />
       <Button title="Search Routes" onPress={searchRoutes} />
     </View>
   );
@@ -71,11 +60,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
   },
-  inputContainer: {
-    width: '100%',
-    marginBottom: 10,
-  },
-  textInput: {
+  input: {
     height: 44,
     color: '#5d5d5d',
     fontSize: 16,
@@ -83,17 +68,6 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     paddingHorizontal: 10,
     borderRadius: 5,
-  },
-  listView: {
-    backgroundColor: '#fff',
-    position: 'absolute',
-    top: 60,
-    width: '100%',
-    zIndex: 1,
-  },
-  row: {
-    padding: 13,
-    height: 44,
-    flexDirection: 'row',
+    marginBottom: 10,
   },
 });
