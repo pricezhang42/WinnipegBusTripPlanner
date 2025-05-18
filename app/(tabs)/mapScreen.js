@@ -62,9 +62,11 @@ export default function MapScreen() {
           console.warn("No matching relation found for origin and destination nodes.");
           return [originNode.coordinates, destinationNode.coordinates];
         }
+
+        const nodes = extractAllNodes(relation);
   
-        const ways = extractWays(relation);
-        return extractWaysBetweenStops(ways, originNode.coordinates, destinationNode.coordinates);
+        const points = extractWayCoordinates(relation, nodes);
+        return extractCoordinatesBetweenStops(points, originNode.coordinates, destinationNode.coordinates);
       }));
   
       setRouteData(routeDataList);
@@ -113,6 +115,15 @@ export default function MapScreen() {
   
     return { originNode, destinationNode };
   };
+
+  const extractAllNodes = (relation) => {
+    return relation.members
+      .filter((member) => member.type === "node" && member.lat && member.lon)
+      .map((node) => ({
+        latitude: node.lat,
+        longitude: node.lon,
+      }));
+  };
   
   // Helper function: Find the matching relation that includes origin and destination nodes in order
   const findRelationWithNodes = (data, originNodeId, destinationNodeId) => {
@@ -128,59 +139,68 @@ export default function MapScreen() {
   };
   
   // Helper function: Extract coordinates from a relation
-  const extractWays = (relation) => {
-    const ways = [];
-    relation.members
-      .filter(m => m.type === 'way' && m.geometry)
-      .map((way, index) => {
+  const extractWayCoordinates = (relation, nodes) => {
+    const coordinates = [];
+    const ways = relation.members.filter(m => m.type === 'way' && m.geometry);
+
+    ways.map((way, index) => {
         // Convert geometry to { latitude, longitude }
         const coords = way.geometry.map(pt => ({
           latitude: pt.lat,
           longitude: pt.lon
         }));
-        ways.push(coords);
+        if (index === 0) {
+          startNodeOfWay = nodes[0];
+        } else {
+          startNodeOfWay = coordinates[coordinates.length-1];
+        }
+        dis_start = squareDistanceOfTwoPonits(coords[0], startNodeOfWay);
+        dis_end = squareDistanceOfTwoPonits(coords[coords.length - 1], startNodeOfWay);
+        if (dis_start > dis_end){
+          coords.reverse();
+        }
+        for (let i= 0; i < coords.length; i++) {
+          coordinates.push(coords[i]);
+        }
       });
-
-    return ways;
+    const coordinates_new = [];
+    for (let i= 0; i < coordinates.length; i++) {
+      if (!coordinates[i+1] || coordinates[i].latitude !== coordinates[i+1].latitude || coordinates[i].longitude !== coordinates[i+1].longitude) {
+        coordinates_new.push(coordinates[i]);
+      }
+    }
+    return coordinates_new;
   };
 
   function squareDistanceOfTwoPonits(a, b) {
     return (a.latitude - b.latitude)**2 + (a.longitude - b.longitude)**2
   }
 
-  function extractWaysBetweenStops(ways, origin, destination) {
+  function extractCoordinatesBetweenStops(coordinates, origin, destination) {
     startIndex = 0;
     endIndex = 0;
-    startIndexInTheWay = 0;
-    endIndexInTheWay = 0;
     closestDistanceStart = 999;
     closestDistanceEnd = 999;
-    for (let w = 0; w < ways.length; w++) {
-      for (let p = 0; p < ways[w].length; p++) {
-        const point = ways[w][p];
-        dis_start = squareDistanceOfTwoPonits(point, origin);
-        dis_end = squareDistanceOfTwoPonits(point, destination);
-        if (dis_start < closestDistanceStart) {
-          closestDistanceStart = dis_start;
-          startIndex = w;
-          startIndexInTheWay = p;
-        }
-        if (dis_end < closestDistanceEnd) {
-          closestDistanceEnd = dis_end;
-          endIndex = w;
-          endIndexInTheWay = p;
-        }
+    for (let p = 0; p < coordinates.length; p++) {
+      const point = coordinates[p];
+      dis_start = squareDistanceOfTwoPonits(point, origin);
+      dis_end = squareDistanceOfTwoPonits(point, destination);
+      if (dis_start < closestDistanceStart) {
+        closestDistanceStart = dis_start;
+        startIndex = p;
+      }
+      if (dis_end < closestDistanceEnd) {
+        closestDistanceEnd = dis_end;
+        endIndex = p;
       }
     }
 
-    waysInBetween = []
-    ways[startIndex] = ways[startIndex].slice(startIndexInTheWay)
-    ways[endIndex] = ways[endIndex].slice(0, endIndexInTheWay+1)
+    pointsInBetween = []
     for (let i = startIndex; i <= endIndex; i++) {
-      waysInBetween.push(ways[i])
+      pointsInBetween.push(coordinates[i])
     }
   
-    return waysInBetween;
+    return pointsInBetween;
   }
   
   // Helper function: Extract segment between origin and destination stops
@@ -263,22 +283,22 @@ export default function MapScreen() {
         maximumZ={19}
         zIndex={-1} // Render beneath other components
       />
-      {routeData.map((route, index) => (
+      {routeData.map((coordinates, index) => (
         <React.Fragment key={index}>
-        {/* <Polyline
+        <Polyline
           coordinates={coordinates}
           strokeWidth={3}
           strokeColor={colorPalette[index % colorPalette.length]} // Assign color based on index
           zIndex={1} // Render above UrlTile
-        /> */}
-        {route.map((way, index) => (
+        />
+        {/* {route.map((way, index) => (
           <Polyline
             key={index}
             coordinates={way}
             strokeWidth={3}
             strokeColor="blue"
           />
-        ))}
+        ))} */}
         {/* Hollow Circle at the Start Point */}
         {/* <Circle
           center={coordinates[0]}
