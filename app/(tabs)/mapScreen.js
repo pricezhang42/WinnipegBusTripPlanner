@@ -63,8 +63,8 @@ export default function MapScreen() {
           return [originNode.coordinates, destinationNode.coordinates];
         }
   
-        const coordinates = extractRelationCoordinates(relation);
-        return extractSegmentBetweenStops(coordinates, originNode.coordinates, destinationNode.coordinates);
+        const ways = extractWays(relation);
+        return extractWaysBetweenStops(ways, originNode.coordinates, destinationNode.coordinates);
       }));
   
       setRouteData(routeDataList);
@@ -128,14 +128,60 @@ export default function MapScreen() {
   };
   
   // Helper function: Extract coordinates from a relation
-  const extractRelationCoordinates = (relation) => {
-    return relation.members
-      .filter((member) => member.type === "node" && member.lat && member.lon)
-      .map((node) => ({
-        latitude: node.lat,
-        longitude: node.lon,
-      }));
+  const extractWays = (relation) => {
+    const ways = [];
+    relation.members
+      .filter(m => m.type === 'way' && m.geometry)
+      .map((way, index) => {
+        // Convert geometry to { latitude, longitude }
+        const coords = way.geometry.map(pt => ({
+          latitude: pt.lat,
+          longitude: pt.lon
+        }));
+        ways.push(coords);
+      });
+
+    return ways;
   };
+
+  function squareDistanceOfTwoPonits(a, b) {
+    return (a.latitude - b.latitude)**2 + (a.longitude - b.longitude)**2
+  }
+
+  function extractWaysBetweenStops(ways, origin, destination) {
+    startIndex = 0;
+    endIndex = 0;
+    startIndexInTheWay = 0;
+    endIndexInTheWay = 0;
+    closestDistanceStart = 999;
+    closestDistanceEnd = 999;
+    for (let w = 0; w < ways.length; w++) {
+      for (let p = 0; p < ways[w].length; p++) {
+        const point = ways[w][p];
+        dis_start = squareDistanceOfTwoPonits(point, origin);
+        dis_end = squareDistanceOfTwoPonits(point, destination);
+        if (dis_start < closestDistanceStart) {
+          closestDistanceStart = dis_start;
+          startIndex = w;
+          startIndexInTheWay = p;
+        }
+        if (dis_end < closestDistanceEnd) {
+          closestDistanceEnd = dis_end;
+          endIndex = w;
+          endIndexInTheWay = p;
+        }
+      }
+    }
+
+    waysInBetween = []
+    ways[startIndex] = ways[startIndex].slice(startIndexInTheWay)
+    ways[endIndex] = ways[endIndex].slice(0, endIndexInTheWay+1)
+    for (let i = startIndex; i <= endIndex; i++) {
+      waysInBetween.push(ways[i])
+    }
+  
+    return waysInBetween;
+  }
   
   // Helper function: Extract segment between origin and destination stops
   const extractSegmentBetweenStops = (coordinates, origin, destination) => {
@@ -217,32 +263,40 @@ export default function MapScreen() {
         maximumZ={19}
         zIndex={-1} // Render beneath other components
       />
-      {routeData.map((coordinates, index) => (
+      {routeData.map((route, index) => (
         <React.Fragment key={index}>
-        <Polyline
+        {/* <Polyline
           coordinates={coordinates}
           strokeWidth={3}
           strokeColor={colorPalette[index % colorPalette.length]} // Assign color based on index
           zIndex={1} // Render above UrlTile
-        />
+        /> */}
+        {route.map((way, index) => (
+          <Polyline
+            key={index}
+            coordinates={way}
+            strokeWidth={3}
+            strokeColor="blue"
+          />
+        ))}
         {/* Hollow Circle at the Start Point */}
-        <Circle
+        {/* <Circle
           center={coordinates[0]}
           radius={10} // Radius in meters
           strokeWidth={2}
           strokeColor={colorPalette[index % colorPalette.length]}
           fillColor="transparent"
           zIndex={2} // Render above Polyline
-        />
+        /> */}
         {/* Hollow Circle at the End Point */}
-        <Circle
+        {/* <Circle
           center={coordinates[coordinates.length - 1]}
           radius={10} // Radius in meters
           strokeWidth={2}
           strokeColor={colorPalette[index % colorPalette.length]}
           fillColor="transparent"
           zIndex={2} // Render above Polyline
-        />
+        /> */}
       </React.Fragment>
       ))}
       {error && <Text style={{ color: 'red', position: 'absolute', top: 10 }}>{error}</Text>}
